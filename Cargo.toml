@@ -2,6 +2,11 @@
 name = "muonts"
 version = "0.1.0"
 edition = "2021"
+homepage = "https://github.com/clsdaniel/muonts"
+repository = "https://github.com/clsdaniel/muonts"
+description = "Timeseries models in rust"
+categories = ["Science", "Mathematics"]
+keywords = ["timeseries", "forecasting", "ml", "machine-learning", "deep-learning"]
 license = "Apache-2.0"
 readme = "README.md"
 
