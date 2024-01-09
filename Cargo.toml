@@ -16,3 +16,5 @@ readme = "README.md"
 burn = {version = "0.11.1", features = ["ndarray", "train", "autodiff"]}
 serde = "1.0.193"
 tracing = "0.1.40"
+rand = "0.8"
+once_cell = "1"
