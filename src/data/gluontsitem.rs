@@ -2,15 +2,13 @@
 use burn::data::dataloader::batcher::Batcher;
 use burn::data::dataset::InMemDataset;
 use burn::tensor::backend::Backend;
-use burn::tensor::ops::TensorOps;
-use burn::tensor::{Data, Int, Tensor, self};
+use burn::tensor::{Data, Int, Tensor};
 use once_cell::sync::OnceCell;
 use rand;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use crate::data::batchitem::BatchItem;
-use tracing::info;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GluonTSItem {
@@ -152,7 +150,7 @@ impl<B: Backend> Batcher<GluonTSItem, BatchItem<B>> for DataBatcher<B> {
 
         // TODO: Currently static reals are ignored
         let feat_static_real: Option<Tensor<B, 2>> = Some(Tensor::zeros([batch_size, 1]));
-        
+
         let feat_dynamic_real: Vec<Tensor<B, 3>> = 
             items
                 .iter()
@@ -160,6 +158,7 @@ impl<B: Backend> Batcher<GluonTSItem, BatchItem<B>> for DataBatcher<B> {
                 .map(|(item, pivot)| {
                     let pivot = *pivot;
                     let target_len = item.target.len();
+
                     match &item.feat_dynamic_real {
                         Some(values) => {
                             let feat_count = values.len();
@@ -171,16 +170,24 @@ impl<B: Backend> Batcher<GluonTSItem, BatchItem<B>> for DataBatcher<B> {
                                 },
                             );
                             let tensor: Tensor<B, 2> = Tensor::from_data(data.convert());
+
+                            // Real features need to be normalized otherwise grandients just explode
+                            let tensor = tensor.clone() / (tensor.clone().max_dim(1) + 1e-8);
+
+                            // Got from [feature, seq] to [seq, feature] and finally unsqueeze to get the
+                            // final shape of [batch, seq, feature] needed
                             let tensor = tensor.swap_dims(0, 1);
                             let tensor : Tensor<B, 3> = tensor.unsqueeze();
+
                             tensor.slice([0..1,pivot..pivot+total_len, 0..feat_count])
                         }
                         None => {
-                            Tensor::zeros([
+                            let zero_tensor: Tensor<B, 3> = Tensor::zeros([
                                 1,
                                 total_len,
                                 1,
-                            ])
+                            ]);
+                            zero_tensor
                         }
                     }
                 })
