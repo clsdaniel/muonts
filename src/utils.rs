@@ -20,7 +20,7 @@ pub fn quantile_loss<B: Backend>(
     let y_true: Tensor<B, 3> = y_true.unsqueeze_dim(2);
     let residual = y_true.clone() - y_pred.clone();
     let loss = y_pred.lower_equal(y_true).float() - quantiles;
-    (residual * loss).abs().sum_dim(2).squeeze(2)
+    (residual * loss).abs().sum_dim(2).squeeze_dim(2)
 }
 
 pub fn split<B: Backend, const D: usize>(

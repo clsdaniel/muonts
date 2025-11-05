@@ -20,7 +20,7 @@ impl<B: Backend> VariableSelectionNetwork<B> {
             None => None,
             Some(tensor) => {
                 let dim_size = variables[0].dims()[1];
-                Some(tensor.repeat(1, dim_size))
+                Some(tensor.repeat_dim(1, dim_size))
             }
         };
 
@@ -44,9 +44,9 @@ impl<B: Backend> VariableSelectionNetwork<B> {
 
                 let var_encodings : Tensor<B, 3> = Tensor::stack(var_encodings, 2);
                 let var_encodings = (var_encodings * weight.clone()).sum_dim(2);
-                let var_encodings : Tensor<B, D> = var_encodings.squeeze(2);
+                let var_encodings : Tensor<B, D> = var_encodings.squeeze_dim(2);
 
-                (var_encodings, weight.squeeze(1))
+                (var_encodings, weight.squeeze_dim(1))
             },
             3 => {
                 let weight : Tensor<B, 4> = weight.unsqueeze_dim(2);
@@ -54,9 +54,9 @@ impl<B: Backend> VariableSelectionNetwork<B> {
 
                 let var_encodings : Tensor<B, 4> = Tensor::stack(var_encodings, 3);
                 let var_encodings = (var_encodings * weight.clone()).sum_dim(3);
-                let var_encodings : Tensor<B, D> = var_encodings.squeeze(3);
+                let var_encodings : Tensor<B, D> = var_encodings.squeeze_dim(3);
 
-                (var_encodings, weight.squeeze(2))
+                (var_encodings, weight.squeeze_dim(2))
             },
             _ => {
                 panic!("Unsupported dimension")
@@ -78,7 +78,7 @@ pub struct VariableSelectionNetworkConfig {
 }
 
 impl VariableSelectionNetworkConfig {
-    pub fn init<B: Backend>(&self) -> VariableSelectionNetwork<B> {
+    pub fn init<B: Backend>(&self, device: &B::Device) -> VariableSelectionNetwork<B> {
         let d_static = if self.add_static { self.d_hidden } else { 0 };
 
         let weight_network: GatedResidualNetwork<B> =
@@ -87,13 +87,13 @@ impl VariableSelectionNetworkConfig {
                 .with_d_output(Some(self.num_vars))
                 .with_d_static(d_static)
                 .with_dropout(self.dropout)
-                .init();
+                .init(device);
 
         let variable_networks: Vec<GatedResidualNetwork<B>> = (0..self.num_vars)
             .map(|_| {
                 GatedResidualNetworkConfig::new(self.d_hidden)
                     .with_dropout(self.dropout)
-                    .init()
+                    .init(device)
             })
             .collect();
 

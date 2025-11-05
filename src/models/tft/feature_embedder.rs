@@ -42,12 +42,12 @@ pub struct FeatureEmbedderConfig {
 }
 
 impl FeatureEmbedderConfig {
-    pub fn init<B: Backend>(&self) -> FeatureEmbedder<B> {
+    pub fn init<B: Backend>(&self, device: &B::Device) -> FeatureEmbedder<B> {
         let embedders: Vec<Embedding<B>> = self
             .cardinalities
             .iter()
             .zip(self.embedding_dims.iter())
-            .map(|(c, e)| EmbeddingConfig::new(*c, *e).init())
+            .map(|(c, e)| EmbeddingConfig::new(*c, *e).init(device))
             .collect();
 
         FeatureEmbedder { embedders }

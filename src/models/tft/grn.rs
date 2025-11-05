@@ -66,7 +66,7 @@ pub struct GatedResidualNetworkConfig {
 }
 
 impl GatedResidualNetworkConfig {
-    pub fn init<B: Backend>(&self) -> GatedResidualNetwork<B> {
+    pub fn init<B: Backend>(&self, device: &B::Device) -> GatedResidualNetwork<B> {
         let d_hidden = self.d_hidden;
         let d_static = self.d_static;
 
@@ -80,20 +80,20 @@ impl GatedResidualNetworkConfig {
         };
 
         let skip_proj = if d_input != d_output {
-            Some(LinearConfig::new(d_input, d_output).init())
+            Some(LinearConfig::new(d_input, d_output).init(device))
         } else {
             None
         };
 
         GatedResidualNetwork {
             skip_proj,
-            mlp_input_linear: LinearConfig::new(d_input + d_static, d_hidden).init(),
+            mlp_input_linear: LinearConfig::new(d_input + d_static, d_hidden).init(device),
             mlp_elu: ELUConfig::new().init(),
-            mlp_dropout_linear: LinearConfig::new(d_hidden, d_hidden).init(),
+            mlp_dropout_linear: LinearConfig::new(d_hidden, d_hidden).init(device),
             mlp_dropout: DropoutConfig::new(self.dropout).init(),
-            mlp_glu_linear: LinearConfig::new(d_hidden, d_output * 2).init(),
+            mlp_glu_linear: LinearConfig::new(d_hidden, d_output * 2).init(device),
             mlp_glu: GatedLinearUnitConfig::new().with_nonlinear(false).init(),
-            layer_norm: LayerNormConfig::new(d_output).init(),
+            layer_norm: LayerNormConfig::new(d_output).init(device),
         }
     }
 }

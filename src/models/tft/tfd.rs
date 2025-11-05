@@ -29,7 +29,7 @@ impl<B: Backend> TemportalFusionDecoder<B> {
         statics: Tensor<B, 3>,
         mask: Tensor<B, 2>,
     ) -> Tensor<B, 3> {
-        let expanded_static = statics.repeat(1, self.context_length + self.prediction_length);
+        let expanded_static = statics.repeat_dim(1, self.context_length + self.prediction_length);
         let skip = {
             let [batch_size, seq_size, val_size] = x.dims();
             x.clone()
@@ -41,7 +41,7 @@ impl<B: Backend> TemportalFusionDecoder<B> {
             let mask_pad = mask.ones_like();
             let [x, _] = mask_pad.dims();
             let mask_pad = mask_pad.slice([0..x, 0..1]);
-            mask_pad.repeat(1, self.prediction_length)
+            mask_pad.repeat_dim(1, self.prediction_length)
         };
 
         let key_padding_mask = (Tensor::cat(vec![mask, mask_pad], 1).neg() + 1.0)
@@ -87,26 +87,26 @@ pub struct TemportalFusionDecoderConfig {
 }
 
 impl TemportalFusionDecoderConfig {
-    pub fn init<B: Backend>(&self) -> TemportalFusionDecoder<B> {
+    pub fn init<B: Backend>(&self, device: &B::Device) -> TemportalFusionDecoder<B> {
         let enrich = GatedResidualNetworkConfig::new(self.d_hidden)
             .with_d_static(self.d_var)
             .with_dropout(self.dropout)
-            .init();
+            .init(device);
 
         let attention = MultiHeadAttentionConfig::new(self.d_hidden, self.num_heads)
             .with_dropout(self.dropout)
-            .init();
+            .init(device);
 
-        let att_net_linear = LinearConfig::new(self.d_hidden, self.d_hidden * 2).init();
+        let att_net_linear = LinearConfig::new(self.d_hidden, self.d_hidden * 2).init(device);
         let att_net_glu = GatedLinearUnitConfig::new().init();
-        let att_lnorm = LayerNormConfig::new(self.d_hidden).init();
+        let att_lnorm = LayerNormConfig::new(self.d_hidden).init(device);
 
         let ff_net_grn = GatedResidualNetworkConfig::new(self.d_hidden)
             .with_dropout(self.dropout)
-            .init();
-        let ff_net_linear = LinearConfig::new(self.d_hidden, self.d_hidden * 2).init();
+            .init(device);
+        let ff_net_linear = LinearConfig::new(self.d_hidden, self.d_hidden * 2).init(device);
         let ff_net_glu = GatedLinearUnitConfig::new().init();
-        let ff_lnorm = LayerNormConfig::new(self.d_hidden).init();
+        let ff_lnorm = LayerNormConfig::new(self.d_hidden).init(device);
 
         TemportalFusionDecoder {
             context_length: self.context_length,

@@ -2,10 +2,10 @@ use crate::data::batchitem::BatchItem;
 use crate::utils::{quantile_loss, weighted_average};
 use burn::config::Config;
 use burn::module::Module;
-use burn::nn::{Linear, LinearConfig};
+use burn::nn::{Linear, LinearConfig, LstmState};
 use burn::tensor::backend::AutodiffBackend;
 use burn::tensor::Int;
-use burn::tensor::{backend::Backend, Data, Shape, Tensor};
+use burn::tensor::{backend::Backend, Tensor};
 use burn::train::{RegressionOutput, TrainOutput, TrainStep, ValidStep};
 
 use super::feature_embedder::{FeatureEmbedder, FeatureEmbedderConfig};
@@ -126,7 +126,7 @@ impl<B: Backend> TemporalFusionTransformerModel<B> {
             let mut embs: Vec<Tensor<B, 2>> = feat_static_embed
                 .forward(feat_static_cat.unwrap())
                 .into_iter()
-                .map(|x| x.squeeze(1))
+                .map(|x| x.squeeze_dim(1))
                 .collect();
 
             static_covariates.append(&mut embs);
@@ -146,7 +146,7 @@ impl<B: Backend> TemporalFusionTransformerModel<B> {
         let c_h = self.state_h.forward(static_var.clone(), None);
         let c_c = self.state_c.forward(static_var, None);
 
-        let states = (c_c, c_h);
+        let states = LstmState::new(c_c, c_h);
 
         let (ctx_input, _) = self
             .ctx_selector
@@ -192,7 +192,7 @@ impl<B: Backend> TemporalFusionTransformerModel<B> {
             past_feat_dynamic_real,
             past_feat_dynamic_cat,
         );
-        let output_pred = pred.clone().mean_dim(2).squeeze(2);
+        let output_pred = pred.clone().mean_dim(2).squeeze_dim(2);
         let loss = quantile_loss(future_target, pred.swap_dims(1, 2), self.quantiles.clone());
         let loss = weighted_average(loss, future_observed_values);
 
@@ -279,13 +279,13 @@ pub struct TemporalFusionTransformerModelConfig {
 }
 
 impl TemporalFusionTransformerModelConfig {
-    pub fn init<B: Backend>(&self) -> TemporalFusionTransformerModel<B> {
+    pub fn init<B: Backend>(&self, device: &B::Device) -> TemporalFusionTransformerModel<B> {
         let num_feat_static = self.d_feat_static_real.len() + self.c_feat_static_cat.len();
         let num_feat_dynamic = self.d_feat_dynamic_real.len() + self.c_feat_dynamic_cat.len();
         let num_past_feat_dynamic =
             self.d_past_feat_dynamic_real.len() + self.c_past_feat_dynamic_cat.len();
 
-        let target_proj = LinearConfig::new(1, self.d_var).init();
+        let target_proj = LinearConfig::new(1, self.d_var).init(device);
 
         let past_feat_dynamic_proj = if self.d_past_feat_dynamic_real.len() > 0 {
             Some(
@@ -296,7 +296,7 @@ impl TemporalFusionTransformerModelConfig {
                         .map(|_| self.d_var)
                         .collect(),
                 )
-                .init(),
+                .init(device),
             )
         } else {
             None
@@ -311,7 +311,7 @@ impl TemporalFusionTransformerModelConfig {
                         .map(|_| self.d_var)
                         .collect(),
                 )
-                .init(),
+                .init(device),
             )
         } else {
             None
@@ -326,7 +326,7 @@ impl TemporalFusionTransformerModelConfig {
                         .map(|_| self.d_var)
                         .collect(),
                 )
-                .init(),
+                .init(device),
             )
         } else {
             None
@@ -338,7 +338,7 @@ impl TemporalFusionTransformerModelConfig {
                     self.c_feat_dynamic_cat.clone(),
                     self.c_feat_dynamic_cat.iter().map(|_| self.d_var).collect(),
                 )
-                .init(),
+                .init(device),
             )
         } else {
             None
@@ -350,7 +350,7 @@ impl TemporalFusionTransformerModelConfig {
                     self.d_feat_static_real.clone(),
                     self.d_feat_static_real.iter().map(|_| self.d_var).collect(),
                 )
-                .init(),
+                .init(device),
             )
         } else {
             None
@@ -362,7 +362,7 @@ impl TemporalFusionTransformerModelConfig {
                     self.c_feat_static_cat.clone(),
                     self.c_feat_static_cat.iter().map(|_| self.d_var).collect(),
                 )
-                .init(),
+                .init(device),
             )
         } else {
             None
@@ -370,7 +370,7 @@ impl TemporalFusionTransformerModelConfig {
 
         let static_selector = VariableSelectionNetworkConfig::new(self.d_var, num_feat_static)
             .with_dropout(self.dropout)
-            .init();
+            .init(device);
 
         let ctx_selector = VariableSelectionNetworkConfig::new(
             self.d_var,
@@ -378,32 +378,32 @@ impl TemporalFusionTransformerModelConfig {
         )
         .with_add_static(true)
         .with_dropout(self.dropout)
-        .init();
+        .init(device);
 
         let tgt_selector = VariableSelectionNetworkConfig::new(self.d_var, num_feat_dynamic)
             .with_add_static(true)
             .with_dropout(self.dropout)
-            .init();
+            .init(device);
 
         let selection = GatedResidualNetworkConfig::new(self.d_var)
             .with_dropout(self.dropout)
-            .init();
+            .init(device);
 
         let enrichment = GatedResidualNetworkConfig::new(self.d_var)
             .with_dropout(self.dropout)
-            .init();
+            .init(device);
 
         let state_h = GatedResidualNetworkConfig::new(self.d_var)
             .with_d_output(Some(self.d_hidden))
             .with_dropout(self.dropout)
-            .init();
+            .init(device);
 
         let state_c = GatedResidualNetworkConfig::new(self.d_var)
             .with_d_output(Some(self.d_hidden))
             .with_dropout(self.dropout)
-            .init();
+            .init(device);
 
-        let temporal_encoder = TemporalFusionEncoderConfig::new(self.d_var, self.d_hidden).init();
+        let temporal_encoder = TemporalFusionEncoderConfig::new(self.d_var, self.d_hidden).init(device);
         let temporal_decoder = TemportalFusionDecoderConfig::new(
             self.context_length,
             self.prediction_length,
@@ -412,12 +412,11 @@ impl TemporalFusionTransformerModelConfig {
             self.num_heads,
         )
         .with_dropout(self.dropout)
-        .init();
+        .init(device);
 
-        let output_proj = LinearConfig::new(self.d_hidden, self.quantiles.len()).init();
+        let output_proj = LinearConfig::new(self.d_hidden, self.quantiles.len()).init(device);
 
-        let quantiles = Data::new(self.quantiles.clone(), Shape::new([self.quantiles.len()]));
-        let quantiles: Tensor<B, 1> = Tensor::from_data(quantiles.convert());
+        let quantiles: Tensor<B, 1> = Tensor::from_floats(self.quantiles.as_slice(), device);
 
         TemporalFusionTransformerModel {
             context_length: self.context_length,

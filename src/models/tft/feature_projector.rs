@@ -34,7 +34,7 @@ pub struct FeatureProjectorConfig {
 }
 
 impl FeatureProjectorConfig {
-    pub fn init<B: Backend>(&self) -> FeatureProjector<B> {
+    pub fn init<B: Backend>(&self, device: &B::Device) -> FeatureProjector<B> {
         assert!(self.feature_dims.len() > 0);
         assert!(self.feature_dims.len() == self.embedding_dims.len());
 
@@ -42,7 +42,7 @@ impl FeatureProjectorConfig {
             .feature_dims
             .iter()
             .zip(self.embedding_dims.iter())
-            .map(|(c, d)| LinearConfig::new(*c, *d).init())
+            .map(|(c, d)| LinearConfig::new(*c, *d).init(device))
             .collect();
 
         FeatureProjector {
