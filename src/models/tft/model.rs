@@ -262,19 +262,19 @@ pub struct TemporalFusionTransformerModelConfig {
     #[config(default = "vec![1]")]
     d_feat_static_real: Vec<usize>,
 
-    #[config(defualt = "vec![1]")]
+    #[config(default = "vec![1]")]
     c_feat_static_cat: Vec<usize>,
 
-    #[config(defualt = "vec![1]")]
+    #[config(default = "vec![1]")]
     d_feat_dynamic_real: Vec<usize>,
 
-    #[config(defualt = "vec![]")]
+    #[config(default = "vec![]")]
     c_feat_dynamic_cat: Vec<usize>,
 
-    #[config(defualt = "vec![]")]
+    #[config(default = "vec![]")]
     d_past_feat_dynamic_real: Vec<usize>,
 
-    #[config(defualt = "vec![]")]
+    #[config(default = "vec![]")]
     c_past_feat_dynamic_cat: Vec<usize>,
 }
 
