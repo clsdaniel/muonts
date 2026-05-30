@@ -6,7 +6,7 @@ use burn::nn::{Linear, LinearConfig, LstmState};
 use burn::tensor::backend::AutodiffBackend;
 use burn::tensor::Int;
 use burn::tensor::{backend::Backend, Tensor};
-use burn::train::{RegressionOutput, TrainOutput, TrainStep, ValidStep};
+use burn::train::{InferenceStep, RegressionOutput, TrainOutput, TrainStep};
 
 use super::feature_embedder::{FeatureEmbedder, FeatureEmbedderConfig};
 use super::feature_projector::{FeatureProjector, FeatureProjectorConfig};
@@ -200,10 +200,12 @@ impl<B: Backend> TemporalFusionTransformerModel<B> {
     }
 }
 
-impl<B: AutodiffBackend> TrainStep<BatchItem<B>, RegressionOutput<B>>
-    for TemporalFusionTransformerModel<B>
+impl<B: AutodiffBackend> TrainStep for TemporalFusionTransformerModel<B>
 {
-    fn step(&self, batch: BatchItem<B>) -> TrainOutput<RegressionOutput<B>> {
+    type Input = BatchItem<B>;
+    type Output = RegressionOutput<B>;
+
+    fn step(&self, batch: Self::Input) -> TrainOutput<Self::Output> {
         let item = self.forward_regression(
             batch.past_target,
             batch.past_observed_values,
@@ -220,10 +222,12 @@ impl<B: AutodiffBackend> TrainStep<BatchItem<B>, RegressionOutput<B>>
     }
 }
 
-impl<B: Backend> ValidStep<BatchItem<B>, RegressionOutput<B>>
-    for TemporalFusionTransformerModel<B>
+impl<B: Backend> InferenceStep for TemporalFusionTransformerModel<B>
 {
-    fn step(&self, batch: BatchItem<B>) -> RegressionOutput<B> {
+    type Input = BatchItem<B>;
+    type Output = RegressionOutput<B>;
+
+    fn step(&self, batch: Self::Input) -> Self::Output {
         self.forward_regression(
             batch.past_target,
             batch.past_observed_values,
